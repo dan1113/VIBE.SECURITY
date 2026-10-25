@@ -99,7 +99,7 @@ async function handleAiReview(request, env) {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 350 },
+        generationConfig: { maxOutputTokens: 700, thinkingConfig: { thinkingLevel: "low" } },
       }),
     });
   } catch {
@@ -124,8 +124,13 @@ async function handleAiReview(request, env) {
   } catch {
     return json({ error: "Gemini 답변을 읽지 못했어요. 다시 시도해 주세요." }, 502);
   }
-  const summary = result.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text || "")
+  const candidate = result.candidates?.[0];
+  if (candidate?.finishReason === "MAX_TOKENS") {
+    return json({ error: "Gemini 답변이 중간에 끊겼어요. 다시 눌러 주세요." }, 502);
+  }
+  const summary = candidate?.content?.parts
+    ?.filter((part) => !part.thought)
+    .map((part) => part.text || "")
     .join("\n")
     .trim();
   if (!summary) return json({ error: "Gemini가 요약을 만들지 못했어요. 다시 시도해 주세요." }, 502);
