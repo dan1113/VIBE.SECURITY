@@ -163,10 +163,72 @@ async function handleAiReview(request, env) {
   return json({ analysis: { summary, priorityActions, repairPrompt } });
 }
 
+
+async function handleUsage(request, env) {
+  if (!env.USAGE_COUNTER) return json({ error: "사용자 집계를 준비하지 못했어요." }, 503);
+  if (request.method !== "GET" && request.method !== "POST") {
+    return json({ error: "GET 또는 POST 요청만 사용할 수 있어요." }, 405);
+  }
+  if (request.method === "POST") {
+    const url = new URL(request.url);
+    const origin = request.headers.get("origin");
+    if (!origin || origin !== url.origin) return json({ error: "같은 사이트에서 보낸 요청만 사용할 수 있어요." }, 403);
+    let body;
+    try {
+      body = JSON.parse(await readLimitedBody(request));
+    } catch {
+      return json({ error: "집계 요청을 읽지 못했어요." }, 400);
+    }
+    if (typeof body.visitorId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.visitorId)) {
+      return json({ error: "브라우저 식별값이 올바르지 않아요." }, 400);
+    }
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body.visitorId));
+    const hashedId = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const id = env.USAGE_COUNTER.idFromName("completed-scan-visitors");
+    const stub = env.USAGE_COUNTER.get(id);
+    const response = await stub.fetch("https://usage-counter/complete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ visitorId: hashedId }),
+    });
+    return new Response(response.body, { status: response.status, headers: response.headers });
+  }
+  const id = env.USAGE_COUNTER.idFromName("completed-scan-visitors");
+  return env.USAGE_COUNTER.get(id).fetch("https://usage-counter/count");
+}
+
+export class UsageCounter {
+  constructor(ctx) {
+    this.ctx = ctx;
+    ctx.blockConcurrencyWhile(async () => {
+      ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS completed_visitors (visitor_id TEXT PRIMARY KEY)");
+    });
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/complete") {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "집계 요청이 올바르지 않아요." }, 400);
+      }
+      if (typeof body.visitorId !== "string" || !/^[0-9a-f]{64}$/.test(body.visitorId)) {
+        return json({ error: "집계 식별값이 올바르지 않아요." }, 400);
+      }
+      this.ctx.storage.sql.exec("INSERT OR IGNORE INTO completed_visitors (visitor_id) VALUES (?)", body.visitorId);
+    } else if (request.method !== "GET" || url.pathname !== "/count") {
+      return json({ error: "요청 경로를 찾을 수 없어요." }, 404);
+    }
+    const row = this.ctx.storage.sql.exec("SELECT COUNT(*) AS count FROM completed_visitors").one();
+    return json({ count: Number(row.count) });
+  }
+}
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/api/ai-review") return handleAiReview(request, env);
+    if (url.pathname === "/api/ai-review") return handleAiReview(request, env);\n    if (url.pathname === "/api/usage") return handleUsage(request, env);
     return env.ASSETS.fetch(request);
   },
 };
