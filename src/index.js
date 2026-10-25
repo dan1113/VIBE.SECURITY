@@ -80,11 +80,12 @@ async function handleAiReview(request, env) {
   if (!findings.length) return json({ error: "요약할 수 있는 점검 항목이 없어요." }, 400);
 
   const prompt = [
-    "한국어로 답하세요. 이 목록은 규칙 기반 예비 점검에서 발견한 확인 후보입니다.",
-    "실제 취약점으로 확정하거나 서비스가 안전하다고 단정하지 마세요.",
-    "개발 초보자에게 쉬운 말로, 150자 안팎으로 설명하세요.",
-    "전체적으로 무엇을 먼저 확인하면 좋을지와 첫 행동을 알려주세요.",
-    "코드나 파일은 전달되지 않았으므로 실제 문제 위치를 추측하지 마세요.",
+    "한국어로만 답하고, 아래 요구에 맞는 JSON 객체만 작성하세요.",
+    "필드는 summary(쉬운 한눈 요약 문자열), priorityActions(먼저 확인할 일 최대 3개의 문자열 배열), repairPrompt(바이브코딩 도구에 붙여넣을 수정 요청문 문자열)입니다.",
+    "목록은 규칙 기반 예비 점검의 확인 후보입니다. 실제 취약점으로 확정하거나 서비스가 안전하다고 단정하지 마세요.",
+    "초보자도 이해할 짧고 쉬운 말로 쓰세요. 위험한 전문용어는 풀어서 설명하세요.",
+    "코드와 파일은 전달되지 않았습니다. 파일명, 줄 번호, 실제 문제 위치를 만들지 마세요.",
+    "수정 요청문에는 주변 코드를 확인하고 실제 문제일 때만 기존 기능을 유지하며 고치고, 잘못된 경고면 이유를 설명하고 수정하지 말라고 적으세요. 확인하지 않은 항목을 해결됐다고 주장하지 말라고 하세요.",
     "발견 후보 목록:",
     ...findings.map((item) => `- ${item.level}: ${item.title}`),
   ].join("\n");
@@ -99,7 +100,7 @@ async function handleAiReview(request, env) {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 700, thinkingConfig: { thinkingLevel: "low" } },
+        generationConfig: { responseMimeType: "application/json", thinkingConfig: { thinkingLevel: "low" } },
       }),
     });
   } catch {
@@ -135,13 +136,28 @@ async function handleAiReview(request, env) {
   if (candidate?.finishReason === "MAX_TOKENS") {
     return json({ error: "Gemini 답변이 중간에 끊겼어요. 다시 눌러 주세요." }, 502);
   }
-  const summary = candidate?.content?.parts
+  const rawText = candidate?.content?.parts
     ?.filter((part) => !part.thought)
     .map((part) => part.text || "")
     .join("\n")
     .trim();
-  if (!summary) return json({ error: "Gemini가 요약을 만들지 못했어요. 다시 시도해 주세요." }, 502);
-  return json({ summary: summary.slice(0, 3000) });
+  if (!rawText) return json({ error: "Gemini가 분석을 만들지 못했어요. 다시 시도해 주세요." }, 502);
+
+  let analysis;
+  try {
+    analysis = JSON.parse(rawText);
+  } catch {
+    return json({ error: "Gemini 답변 형식을 읽지 못했어요. 다시 시도해 주세요." }, 502);
+  }
+  const summary = typeof analysis.summary === "string" ? analysis.summary.trim().slice(0, 600) : "";
+  const priorityActions = Array.isArray(analysis.priorityActions)
+    ? analysis.priorityActions.filter((item) => typeof item === "string").slice(0, 3).map((item) => item.slice(0, 240))
+    : [];
+  const repairPrompt = typeof analysis.repairPrompt === "string" ? analysis.repairPrompt.trim().slice(0, 3000) : "";
+  if (!summary || !priorityActions.length || !repairPrompt) {
+    return json({ error: "Gemini 답변에 필요한 내용이 빠졌어요. 다시 시도해 주세요." }, 502);
+  }
+  return json({ analysis: { summary, priorityActions, repairPrompt } });
 }
 
 export default {
