@@ -117,7 +117,7 @@ async function handleAiReview(request, env) {
     const detail = String(upstreamError?.error?.message || "")
       .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[키 숨김]")
       .replace(/AQ\.[A-Za-z0-9._-]{12,}/g, "[키 숨김]")
-      .replace(/\\s+/g, " ")
+      .replace(/\s+/g, " ")
       .slice(0, 220);
     console.warn("Gemini API request failed", { status: upstream.status, detail });
     const hint = hints[upstream.status] || "잠시 뒤 다시 시도하거나 Gemini 설정을 확인해 주세요.";
