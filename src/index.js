@@ -99,7 +99,7 @@ async function handleAiReview(request, env) {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 350 },
+        generationConfig: { maxOutputTokens: 350 },
       }),
     });
   } catch {
