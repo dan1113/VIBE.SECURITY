@@ -105,7 +105,18 @@ async function handleAiReview(request, env) {
   } catch {
     return json({ error: "Gemini에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요." }, 502);
   }
-  if (!upstream.ok) return json({ error: "Gemini 응답에 문제가 있어요. Cloudflare secret과 Gemini 사용량을 확인해 주세요." }, 502);
+  if (!upstream.ok) {
+    const hints = {
+      400: "요청 형식이나 모델 이름을 확인해 주세요.",
+      401: "GEMINI_API_KEY가 올바른지 확인해 주세요.",
+      403: "이 키의 Gemini API 사용 권한과 결제 설정을 확인해 주세요.",
+      404: "요청한 Gemini 모델을 찾지 못했어요. 모델 설정을 확인해 주세요.",
+      429: "Gemini 사용량 한도에 도달했어요. 사용량·결제 한도를 확인해 주세요.",
+    };
+    console.warn("Gemini API request failed", { status: upstream.status });
+    const hint = hints[upstream.status] || "잠시 뒤 다시 시도하거나 Gemini 설정을 확인해 주세요.";
+    return json({ error: `Gemini 요청 실패 (HTTP ${upstream.status}). ${hint}` }, 502);
+  }
 
   let result;
   try {
