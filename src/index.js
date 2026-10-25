@@ -228,7 +228,8 @@ export class UsageCounter {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/api/ai-review") return handleAiReview(request, env);\n    if (url.pathname === "/api/usage") return handleUsage(request, env);
+    if (url.pathname === "/api/ai-review") return handleAiReview(request, env);
+    if (url.pathname === "/api/usage") return handleUsage(request, env);
     return env.ASSETS.fetch(request);
   },
 };
