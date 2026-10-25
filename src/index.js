@@ -121,7 +121,10 @@ async function handleAiReview(request, env) {
       .replace(/\s+/g, " ")
       .slice(0, 220);
     console.warn("Gemini API request failed", { status: upstream.status, detail });
-    const hint = hints[upstream.status] || "잠시 뒤 다시 시도하거나 Gemini 설정을 확인해 주세요.";
+    const locationBlocked = /user location is not supported/i.test(detail);
+    const hint = locationBlocked
+      ? "Gemini가 Cloudflare 요청 위치를 허용하지 않았어요. Worker를 한국 인근에서 실행하도록 설정했어요. 계속되면 Google이 Cloudflare IP 위치를 다르게 판단하는 문제일 수 있어요."
+      : hints[upstream.status] || "잠시 뒤 다시 시도하거나 Gemini 설정을 확인해 주세요.";
     const detailText = detail ? ` Gemini 안내: ${detail}` : "";
     return json({ error: `Gemini 요청 실패 (HTTP ${upstream.status}). ${hint}${detailText}` }, 502);
   }
