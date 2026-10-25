@@ -35,18 +35,18 @@
       <section class="card results" id="results" aria-live="polite">
         <div class="controls"><h2>진단 결과</h2><button id="export">JSON 저장</button></div>
         <div id="metrics" class="metrics"></div><div id="platformAdvice" class="platform-advice" hidden></div>
-        <section id="aiSummaryBox" class="platform-advice" hidden>
-          <h3>Gemini로 결과를 쉽게 정리</h3>
-          <p>버튼을 누르면 발견 항목의 종류와 심각도만 Gemini로 보내요. ZIP 파일이나 코드 내용은 보내지 않습니다.</p>
-          <button id="aiSummaryButton" type="button">Gemini로 요약하기</button>
-          <p id="aiSummaryText" class="small" aria-live="polite" style="white-space:pre-line"></p>
-        </section>
         <section id="promptBuilder" class="platform-advice">
           <h3>바이브코딩 수정 프롬프트</h3>
           <p>진단 결과를 바탕으로 수정 요청 문장을 만들어요. 이 기능은 ZIP이나 코드를 보내지 않아요.</p>
           <button id="makeProjectPrompt" type="button">수정 프롬프트 만들기</button>
           <textarea id="generatedPrompt" rows="11" readonly hidden aria-label="생성된 수정 프롬프트" style="width:100%;margin-top:12px;padding:12px;border:1px solid #dce5dc;border-radius:10px;font:inherit;line-height:1.6"></textarea>
           <button id="copyProjectPrompt" type="button" hidden>프롬프트 복사</button>
+        </section>
+        <section id="aiSummaryBox" class="platform-advice" hidden>
+          <h3>Gemini로 결과를 쉽게 정리</h3>
+          <p>버튼을 누르면 발견 항목의 종류와 심각도만 Gemini로 보내요. ZIP 파일이나 코드 내용은 보내지 않습니다.</p>
+          <button id="aiSummaryButton" type="button">Gemini로 요약하기</button>
+          <p id="aiSummaryText" class="small" aria-live="polite" style="white-space:pre-line"></p>
         </section>
         <div id="issues"></div>
         <p class="small fineprint" id="disclaimer"></p>
